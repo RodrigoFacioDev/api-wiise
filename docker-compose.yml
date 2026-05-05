@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: impact-hub-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: impact_user
+      POSTGRES_PASSWORD: impact_password
+      POSTGRES_DB: impact_hub
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U impact_user -d impact_hub"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
