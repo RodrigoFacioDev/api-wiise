@@ -8,6 +8,13 @@
       "when": 1777377591347,
       "tag": "0000_elite_killraven",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778515203433,
+      "tag": "0001_secret_blue_shield",
+      "breakpoints": true
     }
   ]
 }

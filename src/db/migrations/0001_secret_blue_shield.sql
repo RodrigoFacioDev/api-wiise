@@ -1,0 +1,1 @@
+ALTER TYPE "public"."usage_type" ADD VALUE 'maintenance';

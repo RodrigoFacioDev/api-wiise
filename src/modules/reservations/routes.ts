@@ -3,7 +3,7 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../db/index.js';
 import { reservations, users, contributions, reservationImpacts } from '../../db/schema/index.js';
-import { eq, desc, count } from 'drizzle-orm';
+import { eq, desc, count, and, lte, gte, ne, or, lt, gt } from 'drizzle-orm';
 import { AppError } from '../../shared/errors/AppError.js';
 import { authenticate } from '../../shared/middlewares/auth.js';
 import { requireAdmin } from '../../shared/middlewares/admin.js';
@@ -40,6 +40,30 @@ export async function reservationsRoutes(app: FastifyInstance) {
     });
   });
 
+  server.get('/reservations/occupied', {
+    schema: {
+      tags: ['Reservations'],
+      summary: 'Get occupied dates',
+      description: 'Returns all dates where there is an active reservation'
+    }
+  }, async (request, reply) => {
+    const data = await db.select({
+      startDate: reservations.startDate,
+      endDate: reservations.endDate,
+      status: reservations.status,
+      usageType: reservations.usageType
+    })
+    .from(reservations)
+    .where(
+      and(
+        ne(reservations.status, 'rejected'),
+        ne(reservations.status, 'cancelled')
+      )
+    );
+
+    return reply.status(200).send(data);
+  });
+
   server.post('/reservations', {
     preValidation: [authenticate],
     schema: {
@@ -53,21 +77,40 @@ export async function reservationsRoutes(app: FastifyInstance) {
     const userList = await db.select().from(users).where(eq(users.id, jwtUser.id)).limit(1);
     const user = userList[0];
 
-    if (!user) throw new AppError('User not found', 'USER_NOT_FOUND', 404);
-    if (user.reputationScore < 0) throw new AppError('Reputation too low', 'REPUTATION_TOO_LOW', 403);
+    if (!user) throw new AppError('Usuário não encontrado', 'USER_NOT_FOUND', 404);
+    if (user.reputationScore < 0) throw new AppError('Reputação muito baixa para realizar reservas', 'REPUTATION_TOO_LOW', 403);
 
     const { startDate, endDate, usageType, eventTitle, eventDescription, contributionType, contributionSubtype, contributionQuantity, contributionUnit, impactCategoryId } = request.body;
 
     const start = new Date(startDate);
     const end = new Date(endDate);
+
+    // 1. Overlap Validation
+    const overlapping = await db.select().from(reservations)
+      .where(
+        and(
+          ne(reservations.status, 'rejected'),
+          ne(reservations.status, 'cancelled'),
+          lt(reservations.startDate, end),
+          gt(reservations.endDate, start)
+        )
+      ).limit(1);
+
+    if (overlapping.length > 0) {
+      throw new AppError('Este horário já está ocupado por outra reserva ou manutenção', 'OVERLAP_ERROR', 400);
+    }
+
     const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) || 1;
     const estimatedValue = (days * 1000).toString();
 
     let equivalentValue = 0;
-    if (contributionType === 'donation' && contributionSubtype === 'cestas_basicas') equivalentValue = contributionQuantity * 100;
-    else if (contributionType === 'time_impact' && contributionSubtype === 'aula_gratuita') equivalentValue = contributionQuantity * 250;
-    else if (contributionType === 'content_impact' && contributionSubtype === 'video_educativo') equivalentValue = contributionQuantity * 200;
-    else equivalentValue = contributionQuantity;
+    // Skip contribution calculation if it's maintenance
+    if (usageType !== 'maintenance') {
+      if (contributionType === 'donation' && contributionSubtype === 'cestas_basicas') equivalentValue = contributionQuantity * 100;
+      else if (contributionType === 'time_impact' && contributionSubtype === 'aula_gratuita') equivalentValue = contributionQuantity * 250;
+      else if (contributionType === 'content_impact' && contributionSubtype === 'video_educativo') equivalentValue = contributionQuantity * 200;
+      else equivalentValue = contributionQuantity;
+    }
 
     const result = await db.transaction(async (tx) => {
       const res = await tx.insert(reservations).values({
@@ -144,7 +187,7 @@ export async function reservationsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { id } = request.params;
     const resList = await db.select().from(reservations).where(eq(reservations.id, id)).limit(1);
-    if (resList.length === 0) throw new AppError('Reservation not found', 'RESERVATION_NOT_FOUND', 404);
+    if (resList.length === 0) throw new AppError('Reserva não encontrada', 'RESERVATION_NOT_FOUND', 404);
     return reply.status(200).send(resList[0]);
   });
 
@@ -159,7 +202,7 @@ export async function reservationsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const { id } = request.params;
     const resList = await db.select({ status: reservations.status }).from(reservations).where(eq(reservations.id, id)).limit(1);
-    if (resList.length === 0) throw new AppError('Reservation not found', 'RESERVATION_NOT_FOUND', 404);
+    if (resList.length === 0) throw new AppError('Reserva não encontrada', 'RESERVATION_NOT_FOUND', 404);
     return reply.status(200).send({ status: resList[0].status });
   });
 
@@ -178,11 +221,11 @@ export async function reservationsRoutes(app: FastifyInstance) {
     
     // Check if it's completing
     if (status === 'completed') {
-       throw new AppError('Use /complete to finish a reservation', 'BAD_REQUEST', 400);
+       throw new AppError('Use o endpoint /complete para finalizar uma reserva', 'BAD_REQUEST', 400);
     }
 
     const updated = await db.update(reservations).set({ status, updatedAt: new Date() }).where(eq(reservations.id, id)).returning();
-    if (updated.length === 0) throw new AppError('Reservation not found', 'RESERVATION_NOT_FOUND', 404);
+    if (updated.length === 0) throw new AppError('Reserva não encontrada', 'RESERVATION_NOT_FOUND', 404);
 
     return reply.status(200).send(updated[0]);
   });
@@ -199,7 +242,7 @@ export async function reservationsRoutes(app: FastifyInstance) {
     const { id } = request.params;
     
     const resList = await db.select().from(reservations).where(eq(reservations.id, id)).limit(1);
-    if (resList.length === 0) throw new AppError('Reservation not found', 'RESERVATION_NOT_FOUND', 404);
+    if (resList.length === 0) throw new AppError('Reserva não encontrada', 'RESERVATION_NOT_FOUND', 404);
     const reservation = resList[0];
 
     const updated = await db.update(reservations).set({ status: 'completed', updatedAt: new Date() }).where(eq(reservations.id, id)).returning();

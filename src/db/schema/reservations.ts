@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, numeric, pgEnum, uuid } from 'drizzle-orm/pg-core';
 import { users } from './users.js';
 
-export const usageTypeEnum = pgEnum('usage_type', ['course', 'social_event', 'content_recording']);
+export const usageTypeEnum = pgEnum('usage_type', ['course', 'social_event', 'content_recording', 'maintenance']);
 export const reservationStatusEnum = pgEnum('reservation_status', ['pending', 'approved', 'rejected', 'completed', 'cancelled']);
 
 export const reservations = pgTable('reservations', {

@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const createReservationSchema = z.object({
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
-  usageType: z.enum(['course', 'social_event', 'content_recording']),
+  usageType: z.enum(['course', 'social_event', 'content_recording', 'maintenance']),
   eventTitle: z.string().min(3),
   eventDescription: z.string().min(10),
   contributionType: z.enum(['donation', 'time_impact', 'content_impact']),
