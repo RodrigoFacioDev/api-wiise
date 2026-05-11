@@ -23,15 +23,26 @@ Antes de começar, você precisará instalar as seguintes ferramentas:
 ### 1. Configurar Variáveis de Ambiente
 Você precisa configurar dois arquivos `.env`:
 
-**Na raiz do projeto (API):**
-```bash
-cp .env.example .env
-```
+**Na raiz do projeto (API Node.js):**
+Crie um arquivo `.env` baseado no `.env.example`:
+| Variável | Descrição | Exemplo |
+| :--- | :--- | :--- |
+| `DATABASE_URL` | Conexão com o Postgres | `postgresql://user:pass@localhost:5432/db` |
+| `PORT` | Porta da API | `3333` |
+| `JWT_SECRET` | Chave para tokens JWT | `sua-chave-secreta` |
 
-**Dentro da pasta `ai_agent` (Agent):**
-```bash
-cp ai_agent/.env.example ai_agent/.env  # Caso exista, ou crie um novo
-```
+**Dentro da pasta `ai_agent` (Python):**
+Crie um arquivo `.env` baseado no `ai_agent/.env.example`:
+| Variável | Descrição | Exemplo |
+| :--- | :--- | :--- |
+| `GOOGLE_API_KEY` | Chave do Gemini | `AIzaSy...` |
+| `API_URL` | URL do backend Node | `http://localhost:3333` |
+
+> [!TIP]
+> **Como obter a GOOGLE_API_KEY:**
+> 1. Acesse o [Google AI Studio](https://aistudio.google.com/).
+> 2. Clique em **"Get API key"** no menu lateral.
+> 3. Crie uma nova chave e cole no campo `GOOGLE_API_KEY`.
 
 ---
 
